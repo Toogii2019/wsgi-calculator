@@ -1,3 +1,5 @@
+import traceback
+from functools import reduce
 """
 For your homework this week, you'll be creating a wsgi application of
 your own.
@@ -41,15 +43,47 @@ To submit your homework:
 
 """
 
+def home():
+    return "<h1> Welcome to Calculator </h1> </br> " \
+           "<li> Add - http://localhost:8080/add/3/5</li> </br>" \
+           "<li> Subtract - http://localhost:8080/subtract/3/5 </li> </br>" \
+           "<li> Multiply - http://localhost:8080/multiply/3/5 </li> </br>" \
+           "<li> Divide - http://localhost:8080/divide/3/5 </li> </br>"
+
+def multiply(*args):
+    try:
+        answer = reduce(lambda x,y:x*y, map(int, args))
+    except ValueError:
+        raise AttributeError
+    return f"Your total is {str(answer)}"
+
+
+def subtract(*args):
+    try:
+        answer = reduce(lambda x,y:x-y, map(int, args))
+    except ValueError:
+        raise AttributeError
+    return f"Your total is {str(answer)}"
+
+
+def divide(*args):
+    try:
+        answer = reduce(lambda x,y:x/y, map(int,args))
+    except (ValueError, ZeroDivisionError):
+        raise AttributeError
+    return f"Your total is {str(answer)}"
+
 
 def add(*args):
     """ Returns a STRING with the sum of the arguments """
 
     # TODO: Fill sum with the correct value, based on the
     # args provided.
-    sum = "0"
-
-    return sum
+    try:
+        answer = sum(map(int, args))
+    except ValueError:
+        raise AttributeError
+    return f"Your total is {str(answer)}"
 
 # TODO: Add functions for handling more arithmetic operations.
 
@@ -63,10 +97,19 @@ def resolve_path(path):
     # examples provide the correct *syntax*, but you should
     # determine the actual values of func and args using the
     # path.
-    func = add
-    args = ['25', '32']
 
-    return func, args
+
+    path = path.strip('/').split('/')
+    func_dict = {'multiply': multiply, 'add': add, 'subtract': subtract, 'divide': divide, '': home }
+
+    args = path[1:]
+
+    try:
+        func_name = func_dict[path[0]]
+    except KeyError:
+        raise NameError
+    return func_name, args
+
 
 def application(environ, start_response):
     # TODO: Your application code from the book database
@@ -76,9 +119,33 @@ def application(environ, start_response):
     #
     # TODO (bonus): Add error handling for a user attempting
     # to divide by zero.
+    headers = [('Content-type', 'text/html')]
+    try:
+        path = environ.get('PATH_INFO', None)
+        if path is None:
+            raise NameError
+        func, args = resolve_path(path)
+        body = func(*args)
+        status = "200 OK"
+    except NameError:
+        status = "404 Not Found"
+        body = "<h1>Not Found</h1>"
+    except AttributeError:
+        status = "400 Bad Request"
+        body = "<h1>Incorrect Parameter</h1>"
+        print(traceback.format_exc())
+    finally:
+        headers.append(('Content-Length', str(len(body))))
+        start_response(status, headers)
+    return [body.encode('utf8')]
+
+
     pass
 
 if __name__ == '__main__':
     # TODO: Insert the same boilerplate wsgiref simple
     # server creation that you used in the book database.
+    from wsgiref.simple_server import make_server
+    srv = make_server('localhost', 8080, application)
+    srv.serve_forever()
     pass
